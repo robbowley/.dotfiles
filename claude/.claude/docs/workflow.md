@@ -669,3 +669,100 @@ If issues found → Classify priority and refactor if high value
 - Work in small increments that maintain a working state
 - PRs should be focused on a single feature or fix
 - Include description of the behavior change, not implementation details
+
+## Safe Refactoring with Claude Code
+
+**Context**: When refactoring complex logic with Claude Code assistance
+
+**Issue**: Claude may attempt to rewrite entire files at once, which is risky for complex logic. Large rewrites can:
+- Introduce subtle bugs that tests don't catch
+- Make it hard to review changes
+- Create unclear git history
+- Be difficult to debug if something breaks
+
+**Solution**: Use incremental refactoring with TDD Guardian to ensure tests stay green throughout:
+
+**Safe refactoring process:**
+
+1. **Commit current working state** - Ensures you can revert if needed
+   ```bash
+   git add .
+   git commit -m "feat: implement feature X"
+   ```
+
+2. **Prompt for incremental changes** - Don't let Claude rewrite everything
+   ```
+   "Review code-style.md and use TDD guardian to fix violations.
+   Make one change at a time, running tests after each."
+   ```
+
+3. **Run tests after EVERY change** - TDD Guardian enforces this
+   ```bash
+   # After each refactoring step
+   npm test  # Must pass before proceeding
+   ```
+
+4. **Commit each successful refactoring** - Clear git history
+   ```bash
+   git commit -m "refactor: remove comments and improve naming"
+   git commit -m "refactor: fix array mutations"
+   git commit -m "refactor: reduce nesting in main function"
+   ```
+
+5. **Review and iterate** - Assess if more refactoring adds value
+   - If code is now clean → Stop, move on
+   - If issues remain → Continue with next targeted change
+
+**Example progression:**
+
+```typescript
+// Initial working code (tests passing)
+git commit -m "feat: implement scanner feature"
+
+// Refactoring Cycle 1: Code style compliance
+// - Remove comments
+// - Fix mutations (push → spread)
+// - Options objects
+git commit -m "refactor: apply code style guidelines"
+
+// Refactoring Cycle 2: Reduce nesting
+// - Extract helper functions
+// - Early returns
+git commit -m "refactor: reduce nesting complexity"
+
+// Refactoring Cycle 3: Single responsibility
+// - Extract focused modules
+// - Clear separation of concerns
+git commit -m "refactor: split into focused modules"
+
+// All tests passing throughout
+// Clear git history showing progression
+// Easy to review each change independently
+```
+
+**Why this works:**
+- **TDD Guardian** verifies tests pass after every change
+- **Small steps** make it easy to identify what broke if tests fail
+- **Clear commits** create reviewable history
+- **Working state** maintained throughout - can stop at any point
+- **Confidence** from continuous test validation
+
+**Anti-pattern to avoid:**
+```
+❌ "Refactor the entire module"
+   → Claude rewrites everything at once
+   → Hundreds of lines changed in one commit
+   → Hard to review, hard to debug
+   → Tests might pass but subtle bugs introduced
+```
+
+**Best practice:**
+```
+✅ "Review code-style.md. Fix mutations first, then reduce nesting,
+    then assess if we need to split modules. Use TDD guardian
+    between each step."
+   → Multiple separate commits
+   → Tests green throughout
+   → Clear progression
+   → Easy to review
+```

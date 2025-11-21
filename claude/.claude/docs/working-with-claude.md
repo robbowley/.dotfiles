@@ -72,3 +72,46 @@ When suggesting or making changes:
 - Flag any deviations from these guidelines with justification
 - Suggest improvements that align with these principles
 - When unsure, ask for clarification rather than assuming
+
+## Claude Code Behavior Patterns
+
+**Context**: When working with Claude Code on complex logic
+
+**Issue**: Claude naturally writes verbose code that doesn't follow established guidelines unless explicitly prompted. Common issues include:
+- Nested if/else statements instead of early returns
+- Comments explaining code instead of self-documenting code
+- Array mutations (push, splice) instead of immutable operations
+- Not using options objects for multi-parameter functions
+
+**Solution**: Explicitly prompt Claude to review code-style.md before refactoring sessions:
+
+```typescript
+// ❌ WRONG - What Claude writes naturally
+const processFiles = (files, options, callback, errorHandler) => {
+  // Check if files exist
+  if (files) {
+    // Process each file
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].type === 'valid') {
+        // Add to results
+        results.push(files[i]); // Mutation!
+      }
+    }
+  }
+};
+
+// ✅ CORRECT - After reviewing code-style.md
+type ProcessFilesOptions = {
+  files: File[]
+  onSuccess: (file: File) => void
+  onError: (error: Error) => void
+}
+
+const processFiles = (options: ProcessFilesOptions): File[] => {
+  const { files, onSuccess, onError } = options
+
+  return files.filter(file => file.type === 'valid')
+}
+```
+
+**Best practice**: When starting complex refactoring, prompt: "Review code-style.md and use TDD guardian to fix" to ensure Claude follows established patterns.

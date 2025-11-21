@@ -74,6 +74,54 @@ Key principles:
 - Compose factories for complex objects
 - Consider using a test data builder pattern for very complex objects
 
+### When to Extract Test Factories
+
+**Wait for the pattern to emerge.** Don't extract factories prematurely - inline test data is fine initially.
+
+**Extract when you see 5-6+ tests with similar setup patterns:**
+
+```typescript
+// ❌ TOO EARLY - Only 2-3 tests, keep inline
+it("should categorize matching document", () => {
+  const file = {
+    relativePath: 'arch.txt',
+    fileType: 'txt',
+    absolutePath: '/data/arch.txt',
+    content: 'System architecture',
+  }
+  // test continues...
+})
+
+// ✅ RIGHT TIME - After 5-6 similar tests, extract factory
+const getMockScannedFile = (
+  overrides?: Partial<ScannedFile>
+): ScannedFile => {
+  return {
+    relativePath: 'architecture/system-design.txt',
+    fileType: 'txt',
+    absolutePath: '/data-room/architecture/system-design.txt',
+    content: 'System architecture using microservices',
+    ...overrides,
+  }
+}
+
+it("should categorize matching document", () => {
+  const file = getMockScannedFile()
+  // test continues...
+})
+
+it("should handle different file types", () => {
+  const file = getMockScannedFile({ fileType: 'pdf' })
+  // test continues...
+})
+```
+
+**Benefits of waiting:**
+- Pattern becomes clear after multiple uses
+- Avoid premature abstraction
+- Factory signature evolves from real needs
+- Easier to identify which fields commonly vary (use as overrides)
+
 ## Validating Test Data
 
 When schemas exist, validate factory output to catch test data issues early:
@@ -236,3 +284,119 @@ describe("PaymentForm", () => {
   });
 });
 ```
+
+## Outside-In TDD with Mocked Dependencies
+
+**Context**: When building features that depend on external systems or complex integrations (APIs, LLMs, databases)
+
+**Pattern**: Define the interface first, mock it in tests, implement the real integration separately. This is "outside-in" development.
+
+**Benefits:**
+- Fast test execution (no network calls, no expensive operations)
+- Clear contracts and interfaces
+- Decoupled architecture
+- Can develop feature logic before integration exists
+
+**Example:**
+
+```typescript
+// Step 1: Define the interface for the dependency
+export type LlmService = {
+  categorize: (params: { content: string; description: string }) => LlmCategorizationResult
+}
+
+export type LlmCategorizationResult = {
+  matched: boolean
+  confidence: number
+  reasoning: string
+}
+
+// Step 2: Write tests with mocked dependency (using vitest)
+import { vi } from 'vitest'
+
+const getMockLlmService = (
+  overrides?: Partial<LlmCategorizationResult>
+): LlmService => {
+  const defaultResult: LlmCategorizationResult = {
+    matched: false,
+    confidence: 0.5,
+    reasoning: 'Mock response',
+    ...overrides,
+  }
+
+  return {
+    categorize: vi.fn().mockReturnValue(defaultResult),
+  }
+}
+
+it('should return matched true when LLM determines content matches', () => {
+  const mockLlmService = getMockLlmService({
+    matched: true,
+    confidence: 0.95,
+    reasoning: 'Document contains system architecture information',
+  })
+
+  const result = categorizeDocument({
+    file: scannedFile,
+    requestedItem: requestedItem,
+    llmService: mockLlmService,  // Inject the mock
+  })
+
+  expect(result.matched).toBe(true)
+  expect(mockLlmService.categorize).toHaveBeenCalledWith({
+    content: 'System architecture using microservices',
+    description: 'System architecture diagrams and documentation',
+  })
+})
+
+// Step 3: Implement feature using dependency injection
+type CategorizeDocumentOptions = {
+  file: ScannedFile
+  requestedItem: RequestedInformationItem
+  llmService: LlmService  // Accept interface, not concrete implementation
+}
+
+export const categorizeDocument = (
+  options: CategorizeDocumentOptions
+): CategorizationResult => {
+  const { file, requestedItem, llmService } = options
+
+  const llmResult = llmService.categorize({
+    content: file.content || '',
+    description: requestedItem.description,
+  })
+
+  return {
+    matched: llmResult.matched,
+  }
+}
+
+// Step 4: Later, implement the real integration
+export const createClaudeLlmService = (apiKey: string): LlmService => {
+  return {
+    categorize: (params) => {
+      // Real Claude API call here
+      const response = callClaudeAPI(params.content, params.description)
+      return {
+        matched: response.matched,
+        confidence: response.confidence,
+        reasoning: response.reasoning,
+      }
+    },
+  }
+}
+
+// Step 5: Wire up in production
+const llmService = createClaudeLlmService(process.env.CLAUDE_API_KEY)
+const result = categorizeDocument({
+  file: myFile,
+  requestedItem: myItem,
+  llmService: llmService,  // Real implementation
+})
+```
+
+**Key principles:**
+- Define clear interface boundaries (use TypeScript `type` for data, `interface` for behavior contracts)
+- Mock at the integration boundary, not internal functions
+- Tests should verify your feature logic, not the external system
+- Real integration implemented and tested separately
