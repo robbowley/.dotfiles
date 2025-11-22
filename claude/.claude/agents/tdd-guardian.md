@@ -313,6 +313,9 @@ const getMockPayment = (
 const payment = getMockPayment({ amount: -100 });
 ```
 
+**Testing Tools:**
+For Vitest-specific operational guidelines including process cleanup requirements, see @~/.claude/docs/testing.md
+
 ## Commands to Use
 
 - `git diff` - See what changed
