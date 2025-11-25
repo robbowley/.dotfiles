@@ -50,8 +50,13 @@ npm run test:ci
 npm run test:run
 npm run test:cleanup
 
+# ✅ CORRECT - Targeted/single-file tests with cleanup
+npm run test:run -- src/features/gap-analyzer.test.ts && npm run test:cleanup
+npm run test:run -- --reporter=verbose src/features/my.test.ts && npm run test:cleanup
+
 # ❌ WRONG - Leaves orphaned processes
 npm test  # This starts watch mode
+npm run test:run -- src/features/my.test.ts  # No cleanup!
 ```
 
 **Implementation guidelines:**
